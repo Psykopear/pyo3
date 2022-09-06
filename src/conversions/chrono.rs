@@ -30,14 +30,14 @@ use crate::{FromPyObject, IntoPy, PyAny, PyObject, PyResult, PyTryFrom, Python, 
 use chrono::offset::{FixedOffset, Utc};
 use chrono::{
     div_mod_floor_64, DateTime, Datelike, Duration, NaiveDate, NaiveDateTime, NaiveTime, Offset,
-    TimeZone, Timelike, NANOS_PER_MICRO, SECS_PER_DAY,
+    TimeZone, Timelike, NANOS_PER_MICRO, SECS_PER_DAY, NANOS_PER_SEC,
 };
 use std::convert::TryInto;
 
 impl ToPyObject for Duration {
     fn to_object(&self, py: Python<'_>) -> PyObject {
-        let micros = self.nanos / NANOS_PER_MICRO;
-        let (days, secs) = div_mod_floor_64(self.secs, SECS_PER_DAY);
+        let micros = self.subsec_nanos() / NANOS_PER_MICRO as u32;
+        let (days, secs) = div_mod_floor_64(self.as_secs() as i64, SECS_PER_DAY);
         // Python will check overflow so even if we reduce the size
         // it will still overflow.
         let days = days.try_into().unwrap_or(i32::MAX);
@@ -46,7 +46,7 @@ impl ToPyObject for Duration {
         // We do not need to check i64 to i32 cast from rust because
         // python will panic with OverflowError.
         // Not sure if we need normalize here.
-        let delta = PyDelta::new(py, days, secs, micros, false).expect("Failed to construct delta");
+        let delta = PyDelta::new(py, days, secs, micros as i32, false).expect("Failed to construct delta");
         delta.into()
     }
 }
@@ -67,7 +67,8 @@ impl FromPyObject<'_> for Duration {
         let secs = delta.get_days() as i64 * SECS_PER_DAY + delta.get_seconds() as i64;
         let nanos = delta.get_microseconds() * NANOS_PER_MICRO;
 
-        Ok(Duration { secs, nanos })
+        Ok(Duration::from_secs_f64(secs as f64 + (nanos as f64) / NANOS_PER_SEC as f64))
+        // Ok(Duration { secs: secs.try_into().unwrap(), nanos: nanos.try_into().unwrap() })
     }
 }
 
