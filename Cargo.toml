@@ -116,6 +116,11 @@ name = "bench_call"
 harness = false
 
 [[bench]]
+name = "bench_chrono_integration"
+harness = false
+required-features = ["chrono"]
+
+[[bench]]
 name = "bench_err"
 harness = false
 
